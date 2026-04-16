@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using Betalgo.Ranul.OpenAI;
 using Betalgo.Ranul.OpenAI.Managers;
 using Betalgo.Ranul.OpenAI.ObjectModels;
@@ -165,5 +168,65 @@ public class OpenAIChatClientTests
         destination.OfType<TextReasoningContent>().First().Text.ShouldBe("thinking trace");
         destination.OfType<TextContent>().Count().ShouldBe(1);
         destination.OfType<TextContent>().First().Text.ShouldBe("final answer");
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_ShouldEmitUsage_WhenTailChunkHasNoChoices()
+    {
+        const string streamPayload = """
+data: {"id":"chatcmpl-stream-1","object":"chat.completion.chunk","created":1776330793,"model":"gemini-3-flash-preview","choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stream-1","object":"chat.completion.chunk","created":1776330793,"model":"gemini-3-flash-preview","choices":[],"usage":{"prompt_tokens":3,"completion_tokens":156,"total_tokens":159,"prompt_tokens_details":{"cached_tokens":0,"text_tokens":3,"audio_tokens":0,"image_tokens":0},"completion_tokens_details":{"text_tokens":0,"audio_tokens":0,"reasoning_tokens":140}}}
+
+data: [DONE]
+""";
+
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(streamPayload, Encoding.UTF8, "text/event-stream")
+            };
+
+            return response;
+        });
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.openai.com")
+        };
+        var service = new OpenAIService(new OpenAIOptions { ApiKey = "fake" }, httpClient);
+        var chatClient = (IChatClient)service;
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in chatClient.GetStreamingResponseAsync([new(ChatRole.User, "hi")], new ChatOptions { ModelId = Models.Gpt_4_turbo }))
+        {
+            updates.Add(update);
+        }
+
+        updates.Count.ShouldBe(2);
+
+        var usageUpdate = updates.Single(u => u.Contents.OfType<UsageContent>().Any());
+        var usageContent = usageUpdate.Contents.OfType<UsageContent>().Single();
+        usageContent.Details.ShouldNotBeNull();
+        usageContent.Details.InputTokenCount.ShouldBe(3);
+        usageContent.Details.OutputTokenCount.ShouldBe(156);
+        usageContent.Details.TotalTokenCount.ShouldBe(159);
+        usageContent.Details.AdditionalCounts.ShouldNotBeNull();
+        usageContent.Details.AdditionalCounts[$"PromptTokensDetails.CachedTokens"].ShouldBe(0);
+        usageContent.Details.AdditionalCounts[$"CompletionTokensDetails.ReasoningTokens"].ShouldBe(140);
+    }
+
+    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
+    {
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return handler(request);
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(handler(request));
+        }
     }
 }

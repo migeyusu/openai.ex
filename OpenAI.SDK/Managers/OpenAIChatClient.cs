@@ -92,7 +92,9 @@ public partial class OpenAIService : IChatClient
         {
             ThrowIfNotSuccessful(response);
 
-            foreach (var choice in response.Choices)
+            var choices = response.Choices ?? [];
+
+            foreach (var choice in choices)
             {
                 ChatResponseUpdate update = new()
                 {
@@ -119,21 +121,26 @@ public partial class OpenAIService : IChatClient
                 PopulateContents(choice.Delta, update.Contents);
 
                 yield return update;
+            }
 
-                if (response.Usage is { } usage)
+            if (response.Usage is { } usage)
+            {
+                var usageChoice = choices.FirstOrDefault();
+                var usageAuthorName = usageChoice?.Delta?.Name;
+                var usageRole = usageChoice?.Delta?.Role;
+                var usageFinishReason = usageChoice?.FinishReason;
+
+                yield return new()
                 {
-                    yield return new()
-                    {
-                        AuthorName = choice.Delta.Name,
-                        Contents = [new UsageContent(GetUsageDetails(usage))],
-                        CreatedAt = response.CreatedAt,
-                        FinishReason = choice.FinishReason is not null ? new(choice.FinishReason) : null,
-                        ModelId = response.Model,
-                        ResponseId = response.Id,
-                        MessageId = response.Id,
-                        Role = choice.Delta.Role is not null ? new(choice.Delta.Role) : null
-                    };
-                }
+                    AuthorName = usageAuthorName,
+                    Contents = [new UsageContent(GetUsageDetails(usage))],
+                    CreatedAt = response.CreatedAt,
+                    FinishReason = usageFinishReason is not null ? new(usageFinishReason) : null,
+                    ModelId = response.Model,
+                    ResponseId = response.Id,
+                    MessageId = response.Id,
+                    Role = usageRole is not null ? new(usageRole) : null
+                };
             }
         }
     }
