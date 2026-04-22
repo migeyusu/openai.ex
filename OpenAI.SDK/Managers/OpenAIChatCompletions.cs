@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Betalgo.Ranul.OpenAI.Extensions;
 using Betalgo.Ranul.OpenAI.Interfaces;
 using Betalgo.Ranul.OpenAI.ObjectModels.RequestModels;
@@ -21,11 +21,11 @@ public partial class OpenAIService : IChatCompletionService
     {
         // Mark the request as streaming
         chatCompletionCreateRequest.Stream = true;
-
+   
         // Send the request to the CompletionCreate endpoint
         chatCompletionCreateRequest.ProcessModelId(modelId, _defaultModelId);
 
-        using var response = _httpClient.PostAsStreamAsync(_endpointProvider.ChatCompletionCreate(), chatCompletionCreateRequest, cancellationToken);
+        using var response = await _httpClient.PostAsStreamAsync(_endpointProvider.ChatCompletionCreate(), chatCompletionCreateRequest, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {

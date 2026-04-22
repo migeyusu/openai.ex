@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -63,7 +63,7 @@ internal static class HttpClientExtensions
     }
 
 
-    public static HttpResponseMessage PostAsStreamAsync(this HttpClient client, string uri, object requestModel, CancellationToken cancellationToken = default)
+    public static async Task<HttpResponseMessage> PostAsStreamAsync(this HttpClient client, string uri, object requestModel, CancellationToken cancellationToken = default)
     {
         var settings = new JsonSerializerOptions
         {
@@ -74,27 +74,7 @@ internal static class HttpClientExtensions
 
         using var request = CreatePostEventStreamRequest(uri, content);
 
-#if NET6_0_OR_GREATER
-        try
-        {
-            return client.Send(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        }
-        catch (PlatformNotSupportedException)
-        {
-            using var newRequest = CreatePostEventStreamRequest(uri, content);
-
-            return SendRequestPreNet6(client, newRequest, cancellationToken);
-        }
-#else
-        return SendRequestPreNet6(client, request, cancellationToken);
-#endif
-    }
-
-    private static HttpResponseMessage SendRequestPreNet6(HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        var responseTask = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        var response = responseTask.GetAwaiter().GetResult();
-        return response;
+        return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 
     private static HttpRequestMessage CreatePostEventStreamRequest(string uri, HttpContent content)

@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Betalgo.Ranul.OpenAI.Extensions;
 using Betalgo.Ranul.OpenAI.Interfaces;
 using Betalgo.Ranul.OpenAI.ObjectModels.RequestModels;
@@ -45,7 +45,7 @@ public partial class OpenAIService : IRunService
         // Send the request to the CompletionCreate endpoint
         request.ProcessModelId(modelId, _defaultModelId, true);
 
-        using var response = _httpClient.PostAsStreamAsync(_endpointProvider.RunCreate(threadId), request, cancellationToken);
+        using var response = await _httpClient.PostAsStreamAsync(_endpointProvider.RunCreate(threadId), request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -152,7 +152,7 @@ public partial class OpenAIService : IRunService
         request.Stream = true;
 
         // Send the request to the CompletionCreate endpoint
-        using var response = _httpClient.PostAsStreamAsync(_endpointProvider.RunSubmitToolOutputs(threadId, runId), request, cancellationToken);
+        using var response = await _httpClient.PostAsStreamAsync(_endpointProvider.RunSubmitToolOutputs(threadId, runId), request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -178,7 +178,7 @@ public partial class OpenAIService : IRunService
         // Send the request to the CompletionCreate endpoint
         createThreadAndRunRequest.ProcessModelId(modelId, _defaultModelId, true);
 
-        using var response = _httpClient.PostAsStreamAsync(_endpointProvider.ThreadAndRunCreate(), createThreadAndRunRequest, cancellationToken);
+        using var response = await _httpClient.PostAsStreamAsync(_endpointProvider.ThreadAndRunCreate(), createThreadAndRunRequest, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
