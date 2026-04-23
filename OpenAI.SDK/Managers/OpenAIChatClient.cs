@@ -39,7 +39,6 @@ public partial class OpenAIService : IChatClient
     async Task<ChatResponse> IChatClient.GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options, CancellationToken cancellationToken)
     {
         var request = CreateRequest(messages, options);
-
         var response = await ChatCompletion.CreateCompletion(request, options?.ModelId, cancellationToken);
         ThrowIfNotSuccessful(response);
 
@@ -233,15 +232,25 @@ public partial class OpenAIService : IChatClient
         }
 
         // Messages
-        request.Messages = [];
+        //request.Messages = ()[];
+        var finalMessages = new List<ObjectModels.RequestModels.ChatMessage>();
         foreach (var message in chatMessages)
         {
             foreach (var requestMessage in ConvertMessageByRole(message))
             {
-                request.Messages.Add(requestMessage);
+                finalMessages.Add(requestMessage);
             }
         }
+        var instructions = options?.Instructions;
+        if (instructions != null && !string.IsNullOrWhiteSpace(instructions))
+        {
+            var index = finalMessages.FindIndex(message => message.Role==ChatCompletionRole.System);
+            finalMessages.Insert(index + 1,
+                new ObjectModels.RequestModels.ChatMessage(ChatCompletionRole.System, instructions));
 
+        }
+
+        request.Messages = finalMessages;
         return request;
 
         static IList<MessageContent> EnsureContents(ObjectModels.RequestModels.ChatMessage target)
